@@ -1,5 +1,4 @@
-from sqlmodel import Field, SQLModel, JSON, ARRAY, Column, String
-from pydantic import EmailStr, field_validator
+from sqlmodel import Field, SQLModel, ARRAY, Column, String
 
 from src.models import SysModel
 

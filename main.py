@@ -19,12 +19,11 @@ def config_settings(config_name, run_migrations):
 
 
 parser = optparse.OptionParser()
-parser.add_option("--config", default="local", help="Which config to load")
-parser.add_option("--migrate", default=False, help="Migrate models to db on startup")
+parser.add_option("--config", default="local", help="which config to load")
+parser.add_option("--migrate", default=False, help="migrate models to db on startup")
 options, args = parser.parse_args()
 
 settings = config_settings(options.config, options.migrate)
-
 
 app = create_fastapi_app(settings)
 
