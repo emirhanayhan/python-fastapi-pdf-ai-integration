@@ -22,7 +22,7 @@ def init_users_api(app):
             del user.password
 
             return user
-        # return {"status": "ok"}
+
 
     # @app.get("/api/v1/users/{user_id}")
     # async def get_user(user_id: str, request: Request):

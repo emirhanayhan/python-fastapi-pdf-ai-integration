@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from src.api.healthcheck import init_healthcheck_api
 from src.api.users import init_users_api
+from src.api.tokens import init_tokens_api
 
 
 @asynccontextmanager
@@ -42,5 +43,6 @@ def create_fastapi_app(settings):
 
     init_healthcheck_api(app)
     init_users_api(app)
+    init_tokens_api(app)
 
     return app
