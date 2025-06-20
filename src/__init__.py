@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 from motor.motor_asyncio import AsyncIOMotorClient
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -10,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from src.api.healthcheck import init_healthcheck_api
 from src.api.users import init_users_api
 from src.api.tokens import init_tokens_api
+from src.utils.exceptions import AppException
 
 
 @asynccontextmanager
@@ -37,10 +39,30 @@ async def lifespan(app):
     yield
 
 
+def init_exception_handler(app):
+    @app.exception_handler(Exception)
+    async def exception_handler(rq, exc: Exception):
+        if isinstance(exc, AppException):
+            return JSONResponse(
+                status_code=exc.status_code,
+                content={"error_msg": exc.error_message, "error_code": exc.error_code}
+            )
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error_msg": "internal server error {}".format(type(exc).__name__),
+                "error_code": "exceptions.internalServerError"
+            }
+        )
+
+
 def create_fastapi_app(settings):
     app = FastAPI(lifespan=lifespan)
     app.config = settings
 
+    init_exception_handler(app)
+
+    # init apis
     init_healthcheck_api(app)
     init_users_api(app)
     init_tokens_api(app)
