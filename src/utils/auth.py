@@ -39,6 +39,7 @@ async def authenticate_and_authorize(rq: Request):
                 error_code="exceptions.userNotFound",
                 status_code=404
             )
+
     verified_decoded = jwt.decode(token, key=user.password, algorithms="HS256", options={"verify_signature": True, "verify_exp": True})
     if required_permission not in role.permissions:
         raise AppException(
@@ -46,3 +47,5 @@ async def authenticate_and_authorize(rq: Request):
             error_code="exceptions.userNotAuthorized",
             status_code=403
         )
+
+    return user
