@@ -32,7 +32,7 @@ def init_tokens_api(app):
         # TODO this started to look ugly
         ac_token, rf_token = await asyncio.wrap_future(
             request.app.thread_pool.submit(
-                generate_jwt_token, str(user.id.hex), credentials.password,
+                generate_jwt_token, str(user.id.hex), user.password,
                 request.app.config["access_token_ttl"],
                 request.app.config["refresh_token_ttl"],
             )

@@ -1,16 +1,18 @@
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
-from motor.motor_asyncio import AsyncIOMotorClient
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorGridFSBucket
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import SQLModel
+from jwt.exceptions import InvalidSignatureError, ExpiredSignatureError
 from concurrent.futures import ThreadPoolExecutor
 
 from src.api.healthcheck import init_healthcheck_api
 from src.api.users import init_users_api
 from src.api.tokens import init_tokens_api
+from src.api.pdfs import init_pdfs_api
 from src.utils.exceptions import AppException
 
 
@@ -19,6 +21,7 @@ async def lifespan(app):
     # init mongo client
     db_client = AsyncIOMotorClient(app.config["mongo_connection_string"], retryWrites=True)
     app.db = db_client[app.config["mongo_database_name"]]
+    app.fs = AsyncIOMotorGridFSBucket(app.db)
 
     # init postgres client
     pg_engine = create_async_engine(app.config["postgres_connection_string"])
@@ -47,6 +50,20 @@ def init_exception_handler(app):
                 status_code=exc.status_code,
                 content={"error_msg": exc.error_message, "error_code": exc.error_code}
             )
+        elif isinstance(exc, InvalidSignatureError):
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "error_msg": "Authentication token is invalid",
+                    "error_code": "exceptions.invalidAuthenticationToken"}
+            )
+        elif isinstance(exc, ExpiredSignatureError):
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "error_msg": "Authentication token is expired",
+                    "error_code": "exceptions.expiredAuthenticationToken"}
+            )
         return JSONResponse(
             status_code=500,
             content={
@@ -66,5 +83,6 @@ def create_fastapi_app(settings):
     init_healthcheck_api(app)
     init_users_api(app)
     init_tokens_api(app)
+    init_pdfs_api(app)
 
     return app
