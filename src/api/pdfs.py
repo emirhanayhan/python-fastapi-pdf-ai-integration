@@ -76,7 +76,7 @@ def init_pdfs_api(app):
         return {"selected_pdf": str(file_id)}
 
     @app.post("/api/v1/pdfs-chat")
-    async def pdf_chat(request: Request, user_message:ChatMessage, user: UserModel = Depends(authenticate_and_authorize)):
+    async def pdf_chat(request: Request, user_message: ChatMessage, user: UserModel = Depends(authenticate_and_authorize)):
         file_meta = await request.app.db.files_metadata.find_one(
             {"user_id": user.id.hex, "is_selected": True}
         )
@@ -116,4 +116,36 @@ def init_pdfs_api(app):
             await session.commit()
         return payload
 
+    @app.post("/api/v1/pdfs-chat/{file_id}")
+    async def pdf_chat_with_id(request: Request, file_id: str, user_message: ChatMessage, user: UserModel = Depends(authenticate_and_authorize)):
+        # this select pdf thing is requirement for case
+        # but i don't think its a good way to go so i
+        # make this endpoint to be an better alternative
+        grid_out = await request.app.fs.open_download_stream(ObjectId(file_id))
+        pdf_reader = PdfReader(BytesIO(await grid_out.read()))
+        content = "".join([page.extract_text() for page in pdf_reader.pages])
 
+        response = await request.app.ai_client.chat.completions.create(
+            model=request.app.config["gemini_model"],
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant about user documents"
+                               " will be specified as document_text-->[text] user_message-->[message]"},
+                {
+                    "role": "user",
+                    "content": "document_text-->[{}] user_message-->[{}]".format(content, user_message.message)
+                }
+            ]
+        )
+
+        payload = {
+            "user_message": user_message.message,
+            "ai_response": response.choices[0].message.content,
+            "selected_pdf": str(file_id),
+        }
+        async with request.app.pg_session() as session:
+            event = EventModel(user_id=user.id, document=payload, type="pdf_chat_with_id")
+            session.add(event)
+            await session.commit()
+        return payload

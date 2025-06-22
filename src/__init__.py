@@ -8,6 +8,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import SQLModel
 from jwt.exceptions import InvalidSignatureError, ExpiredSignatureError
 from concurrent.futures import ThreadPoolExecutor
+from gridfs.errors import NoFile
 from openai import AsyncClient
 
 from src.api.healthcheck import init_healthcheck_api
@@ -67,6 +68,13 @@ def init_exception_handler(app):
                 content={
                     "error_msg": "Authentication token is expired",
                     "error_code": "exceptions.expiredAuthenticationToken"}
+            )
+        elif isinstance(exc, NoFile):
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "error_msg": "File not found",
+                    "error_code": "exceptions.fileNotFound"}
             )
         return JSONResponse(
             status_code=500,

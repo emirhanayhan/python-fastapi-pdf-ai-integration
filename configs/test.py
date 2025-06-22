@@ -1,8 +1,7 @@
 from os import getenv
 
-# this configuration has default values set
 test_config = {
-    "config": "local",
+    "config": "test",
     "host": getenv("HOST", "0.0.0.0"),
     "port": int(getenv("PORT", "8000")),
     "mongo_connection_string": getenv("MONGO_CONNECTION_STRING", "mongodb://localhost:27017/"),
