@@ -2,13 +2,15 @@ import optparse
 import uvicorn
 
 from configs.local import local_config
+from configs.prod import prod_config
+from configs.stage import stage_config
 from src import create_fastapi_app
 
 
 CONFIG_LOOKUP = {
     "local": local_config,
-    "prod": "",
-    "stage": ""
+    "prod": prod_config,
+    "stage": stage_config
 }
 
 

@@ -8,6 +8,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import SQLModel
 from jwt.exceptions import InvalidSignatureError, ExpiredSignatureError
 from concurrent.futures import ThreadPoolExecutor
+from openai import AsyncClient
 
 from src.api.healthcheck import init_healthcheck_api
 from src.api.users import init_users_api
@@ -31,6 +32,7 @@ async def lifespan(app):
     if app.config["run_migrations"]:
         from src.models.users import UserModel
         from src.models.roles import RoleModel
+        from src.models.events import EventModel
         async with pg_engine.begin() as connection:
             await connection.run_sync(SQLModel.metadata.create_all)
 
@@ -38,6 +40,8 @@ async def lifespan(app):
     # not forget the use it with asyncio.wrap_future
     # otherwise still blocks event loop
     app.thread_pool = ThreadPoolExecutor()
+
+    app.ai_client = AsyncClient(api_key=app.config["gemini_api_key"], base_url=app.config["gemini_base_url"])
 
     yield
 

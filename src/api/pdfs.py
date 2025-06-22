@@ -1,11 +1,14 @@
+from bson import ObjectId
 from fastapi import Request, Depends, UploadFile
 from PyPDF2 import PdfReader
 from io import BytesIO
 import hashlib
 
 from src.utils.auth import authenticate_and_authorize
-from src.models.users import UserModel
 from src.utils.exceptions import AppException
+from src.models.users import UserModel
+from src.models.messages import ChatMessage
+from src.models.events import EventModel
 
 
 def init_pdfs_api(app):
@@ -26,7 +29,8 @@ def init_pdfs_api(app):
             )
 
         file_id = await request.app.fs.upload_from_stream(
-            pdf.filename, pdf_stream,
+            pdf.filename,  BytesIO(pdf_bytes),
+            metadata={"content_type": pdf.content_type}
             # normally i would store metadata like this
             # but case requirement saying metadata
             # needs to be stored in separate collection
@@ -43,7 +47,7 @@ def init_pdfs_api(app):
         return {"file_id": str(file_id)}
 
     @app.get("/api/v1/pdfs-list", status_code=200)
-    async def get_user_pdfs(request:Request, user: UserModel = Depends(authenticate_and_authorize)):
+    async def get_user_pdfs(request: Request, user: UserModel = Depends(authenticate_and_authorize)):
         user_pdfs = request.app.db.files_metadata.find(
             {"user_id": user.id.hex}, {"file_id": 1}
         )
@@ -70,3 +74,46 @@ def init_pdfs_api(app):
         )
 
         return {"selected_pdf": str(file_id)}
+
+    @app.post("/api/v1/pdfs-chat")
+    async def pdf_chat(request: Request, user_message:ChatMessage, user: UserModel = Depends(authenticate_and_authorize)):
+        file_meta = await request.app.db.files_metadata.find_one(
+            {"user_id": user.id.hex, "is_selected": True}
+        )
+        if not file_meta:
+            raise AppException(
+                error_message="Selected pdf not found",
+                error_code="exceptions.selectedPdfNotFound",
+                status_code=404
+            )
+
+        grid_out = await request.app.fs.open_download_stream(ObjectId(file_meta["file_id"]))
+        pdf_reader = PdfReader(BytesIO(await grid_out.read()))
+        content = "".join([page.extract_text() for page in pdf_reader.pages])
+
+        response = await request.app.ai_client.chat.completions.create(
+            model=request.app.config["gemini_model"],
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant about user documents"
+                               " will be specified as document_text-->[text] user_message-->[message]"},
+                {
+                    "role": "user",
+                    "content": "document_text-->[{}] user_message-->[{}]".format(content, user_message.message)
+                }
+            ]
+        )
+
+        payload = {
+            "user_message": user_message.message,
+            "ai_response": response.choices[0].message.content,
+            "selected_pdf": str(file_meta["file_id"]),
+        }
+        async with request.app.pg_session() as session:
+            event = EventModel(user_id=user.id, document=payload, type="pdf_chat")
+            session.add(event)
+            await session.commit()
+        return payload
+
+

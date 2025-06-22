@@ -8,20 +8,19 @@ from src.models.users import UserModel
 def init_users_api(app):
     @app.post("/api/v1/users", status_code=201)
     async def create_user(user: UserModel, request: Request):
+        hashed_password = await asyncio.wrap_future(
+            request.app.thread_pool.submit(hash.bcrypt.hash, user.password)
+        )
+        user.password = hashed_password
         async with request.app.pg_session() as session:
             # safe store password
-            hashed_password = await asyncio.wrap_future(
-                request.app.thread_pool.submit(hash.bcrypt.hash, user.password)
-            )
-            user.password = hashed_password
-
             session.add(user)
             await session.commit()
 
-            # not return hashed password to client
-            del user.password
+        # not return hashed password to client
+        del user.password
 
-            return user
+        return user
 
 
     # @app.get("/api/v1/users/{user_id}")
